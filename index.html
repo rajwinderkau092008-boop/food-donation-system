@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Food Donation Coordination System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .badge-veg { background-color: #e6f4ea; color: #137333; border: 1px solid #ceead6; }
+    .badge-nonveg { background-color: #fce8e6; color: #c5221f; border: 1px solid #fad2cf; }
+    .pulse-urgent { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .6; } }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-emerald-700 text-white shadow-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="switchRole(currentRole)">
+        <div class="bg-white text-emerald-700 p-2 rounded-lg font-black text-xl shadow">
+          <i class="fa-solid fa-bowl-food"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg sm:text-xl leading-tight">Food Donation System</h1>
+          <p class="text-xs text-emerald-100 hidden sm:block">Connecting Surplus Food with Those in Need</p>
+        </div>
+      </div>
+
+      <!-- Role Switcher & Live Clock -->
+      <div class="flex items-center space-x-3">
+        <div class="bg-emerald-800/80 px-3 py-1.5 rounded-lg border border-emerald-600 flex items-center space-x-2 text-sm">
+          <i class="fa-solid fa-user-circle text-emerald-300"></i>
+          <span class="text-xs text-emerald-200">Acting As:</span>
+          <select id="roleSelector" onchange="switchRole(this.value)" class="bg-transparent text-white font-semibold focus:outline-none cursor-pointer">
+            <option value="DONOR" class="text-slate-800">🏨 Donor (The Grand Taj)</option>
+            <option value="NGO" class="text-slate-800">🤝 NGO (Hope Shelter)</option>
+            <option value="ADMIN" class="text-slate-800">🛡️ Admin / Coordinator</option>
+          </select>
+        </div>
+        
+        <!-- Notifications Bell -->
+        <button onclick="toggleNotificationPanel()" class="relative p-2 rounded-full hover:bg-emerald-600 transition" title="Notifications">
+          <i class="fa-solid fa-bell"></i>
+          <span id="notifBadge" class="absolute top-1 right-1 bg-amber-400 text-emerald-950 font-bold text-[10px] w-4 h-4 rounded-full flex items-center justify-center">2</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Notification Dropdown Panel -->
+  <div id="notifPanel" class="hidden fixed top-16 right-4 sm:right-8 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+    <div class="bg-slate-100 px-4 py-3 border-b flex justify-between items-center">
+      <h3 class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-bell text-emerald-600 mr-2"></i>Recent Alerts</h3>
+      <button onclick="clearNotifications()" class="text-xs text-emerald-600 hover:underline">Mark all read</button>
+    </div>
+    <div id="notifList" class="max-h-80 overflow-y-auto divide-y divide-slate-100 text-xs">
+      <!-- Injected by JS -->
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- Role Header Banner -->
+    <div id="roleBanner" class="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-2xl p-5 mb-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div>
+        <span id="roleTag" class="bg-white/20 text-xs font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider">DONOR PORTAL</span>
+        <h2 id="roleWelcome" class="text-xl sm:text-2xl font-bold mt-1">Welcome, The Grand Taj Hotel</h2>
+        <p id="roleSubtext" class="text-emerald-100 text-sm mt-0.5">Post surplus meals and verify charity volunteer collections.</p>
+      </div>
+      <div id="roleActionBtnContainer">
+        <!-- Injected depending on role -->
+      </div>
+    </div>
+
+    <!-- Quick Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="statsGrid">
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+        <div class="p-3 bg-emerald-50 text-emerald-600 rounded-lg text-xl"><i class="fa-solid fa-bowl-rice"></i></div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Meals Provided</p>
+          <p id="statMeals" class="text-lg sm:text-2xl font-black text-slate-800">1,420</p>
+        </div>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+        <div class="p-3 bg-amber-50 text-amber-600 rounded-lg text-xl"><i class="fa-solid fa-scale-balanced"></i></div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Food Rescued</p>
+          <p id="statKg" class="text-lg sm:text-2xl font-black text-slate-800">580 kg</p>
+        </div>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+        <div class="p-3 bg-blue-50 text-blue-600 rounded-lg text-xl"><i class="fa-solid fa-clock-rotate-left"></i></div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Active Donations</p>
+          <p id="statActive" class="text-lg sm:text-2xl font-black text-slate-800">2 Active</p>
+        </div>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+        <div class="p-3 bg-purple-50 text-purple-600 rounded-lg text-xl"><i class="fa-solid fa-hand-holding-heart"></i></div>
+        <div>
+          <p class="text-xs text-slate-500 font-medium">Partner NGOs</p>
+          <p id="statNGOs" class="text-lg sm:text-2xl font-black text-slate-800">8 Verified</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 1: DONOR VIEW -->
+    <section id="donorSection" class="space-y-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h3 class="font-bold text-lg text-slate-800">Your Active & Past Food Donations</h3>
+          <p class="text-slate-500 text-xs">Track real-time collection status and verify arriving NGO volunteers.</p>
+        </div>
+        <button onclick="openModal('addFoodModal')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center space-x-2 shadow transition">
+          <i class="fa-solid fa-plus"></i>
+          <span>Add Surplus Food</span>
+        </button>
+      </div>
+
+      <div id="donorListings" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Injected by JS -->
+      </div>
+    </section>
+
+    <!-- VIEW 2: NGO VIEW -->
+    <section id="ngoSection" class="hidden space-y-6">
+      <!-- Search & Filters -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap gap-3 items-center justify-between">
+        <div class="flex items-center space-x-2 flex-1 min-w-[200px]">
+          <i class="fa-solid fa-magnifying-glass text-slate-400"></i>
+          <input type="text" id="ngoSearch" oninput="renderNGOFeed()" placeholder="Search food title, cuisine, or donor..." class="w-full text-sm outline-none bg-transparent">
+        </div>
+        <div class="flex flex-wrap gap-2 text-xs">
+          <select id="ngoFilterDiet" onchange="renderNGOFeed()" class="bg-slate-50 border rounded-lg px-2.5 py-1.5 font-medium text-slate-600">
+            <option value="ALL">All Dietary Types</option>
+            <option value="VEG">🌱 Pure Veg</option>
+            <option value="NON_VEG">🍗 Non-Veg</option>
+          </select>
+          <select id="ngoFilterDistance" onchange="renderNGOFeed()" class="bg-slate-50 border rounded-lg px-2.5 py-1.5 font-medium text-slate-600">
+            <option value="ALL">Any Distance</option>
+            <option value="3">Within 3 km</option>
+            <option value="5">Within 5 km</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Tab: Available Feed vs My Pickups -->
+      <div class="flex border-b border-slate-200 space-x-6 text-sm font-bold">
+        <button onclick="setNgoTab('FEED')" id="tabNgoFeed" class="pb-2 border-b-2 border-emerald-600 text-emerald-700 flex items-center space-x-2">
+          <i class="fa-solid fa-list-check"></i>
+          <span>Available Surplus Food</span>
+          <span id="ngoAvailableCount" class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full">0</span>
+        </button>
+        <button onclick="setNgoTab('MY_PICKUPS')" id="tabNgoPickups" class="pb-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2">
+          <i class="fa-solid fa-truck"></i>
+          <span>My Active Claims & Pickups</span>
+          <span id="ngoClaimedCount" class="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full">0</span>
+        </button>
+      </div>
+
+      <div id="ngoListings" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Injected by JS -->
+      </div>
+    </section>
+
+    <!-- VIEW 3: ADMIN VIEW -->
+    <section id="adminSection" class="hidden space-y-6">
+      <!-- Admin Sub-navigation -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left: NGO Verification Queue -->
+        <div class="lg:col-span-1 bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex justify-between items-center border-b pb-3">
+            <h3 class="font-bold text-slate-800 flex items-center text-sm">
+              <i class="fa-solid fa-id-card text-emerald-600 mr-2"></i>
+              NGO Verification Requests
+            </h3>
+            <span id="pendingNgoBadge" class="bg-amber-100 text-amber-800 font-bold text-xs px-2 py-0.5 rounded-full">1 Pending</span>
+          </div>
+          <div id="adminNgoList" class="space-y-3">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+
+        <!-- Right: Master Donation Logs & Actions -->
+        <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex justify-between items-center border-b pb-3">
+            <h3 class="font-bold text-slate-800 flex items-center text-sm">
+              <i class="fa-solid fa-clipboard-list text-emerald-600 mr-2"></i>
+              Live Community Donation Stream
+            </h3>
+            <button onclick="exportCSVReport()" class="text-xs bg-slate-100 hover:bg-slate-200 font-semibold px-3 py-1.5 rounded-lg border text-slate-700 transition">
+              <i class="fa-solid fa-file-csv mr-1 text-emerald-600"></i> Export Report
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left text-slate-600">
+              <thead class="bg-slate-50 text-slate-500 font-semibold uppercase">
+                <tr>
+                  <th class="p-2.5">ID</th>
+                  <th class="p-2.5">Food Item</th>
+                  <th class="p-2.5">Donor</th>
+                  <th class="p-2.5">Quantity</th>
+                  <th class="p-2.5">Status</th>
+                  <th class="p-2.5">Action</th>
+                </tr>
+              </thead>
+              <tbody id="adminTableBody" class="divide-y divide-slate-100 font-medium">
+                <!-- Injected by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: ADD SURPLUS FOOD -->
+  <div id="addFoodModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div class="bg-emerald-700 text-white px-5 py-4 flex justify-between items-center sticky top-0 z-10">
+        <h3 class="font-bold text-base flex items-center space-x-2">
+          <i class="fa-solid fa-bowl-rice"></i>
+          <span>Post Surplus Food Details</span>
+        </h3>
+        <button onclick="closeModal('addFoodModal')" class="text-emerald-200 hover:text-white text-lg">&times;</button>
+      </div>
+      <form id="addFoodForm" onsubmit="handleFoodSubmit(event)" class="p-5 space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Food Item Title *</label>
+          <input type="text" id="fTitle" required placeholder="e.g., Steamed Basmati Rice & Mixed Dal Curry" class="w-full border rounded-lg p-2.5 outline-none focus:border-emerald-600">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Category *</label>
+            <select id="fCategory" class="w-full border rounded-lg p-2.5 outline-none bg-white">
+              <option value="COOKED">Cooked Meal</option>
+              <option value="BAKERY">Bakery & Breads</option>
+              <option value="RAW">Raw Grains / Veggies</option>
+              <option value="PACKAGED">Packaged Food</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Dietary Classification *</label>
+            <select id="fType" class="w-full border rounded-lg p-2.5 outline-none bg-white">
+              <option value="VEG">🌱 Vegetarian</option>
+              <option value="NON_VEG">🍗 Non-Vegetarian</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Quantity (Servings) *</label>
+            <input type="number" id="fServings" min="1" required placeholder="e.g., 60" class="w-full border rounded-lg p-2.5 outline-none focus:border-emerald-600">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Approx Weight (kg)</label>
+            <input type="number" id="fWeight" min="1" placeholder="e.g., 25" class="w-full border rounded-lg p-2.5 outline-none focus:border-emerald-600">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Preparation Time *</label>
+            <input type="time" id="fCookTime" required class="w-full border rounded-lg p-2.5 outline-none bg-white">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Safe Until (Expiry Deadline) *</label>
+            <input type="time" id="fExpiryTime" required class="w-full border rounded-lg p-2.5 outline-none bg-white">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Pickup Location & Landmark *</label>
+          <input type="text" id="fAddress" required value="45 Central Avenue, Kitchen Gate No. 2" class="w-full border rounded-lg p-2.5 outline-none">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Packaging / Storage Instructions</label>
+          <input type="text" id="fStorage" placeholder="e.g., Stored in clean hot stainless steel vessels" class="w-full border rounded-lg p-2.5 outline-none">
+        </div>
+
+        <div class="bg-amber-50 border border-amber-200 p-3 rounded-lg flex items-start space-x-2">
+          <input type="checkbox" id="fHygiene" required class="mt-0.5 rounded text-emerald-600">
+          <label for="fHygiene" class="text-amber-900 leading-tight">
+            I declare that this food was prepared under clean, hygienic conditions and is safe for human consumption within the stated expiry window.
+          </label>
+        </div>
+
+        <div class="flex justify-end space-x-2 pt-2 border-t">
+          <button type="button" onclick="closeModal('addFoodModal')" class="px-4 py-2 border rounded-lg font-medium text-slate-600 hover:bg-slate-100">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow">Publish Donation</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: OTP HANDOVER VERIFICATION -->
+  <div id="otpModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 space-y-4 text-center">
+      <div class="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto text-xl">
+        <i class="fa-solid fa-key"></i>
+      </div>
+      <div>
+        <h3 class="font-bold text-slate-800 text-base">Handover Verification</h3>
+        <p class="text-slate-500 text-xs mt-1">Ask the arriving NGO volunteer for their 4-digit pickup code to confirm food handover.</p>
+      </div>
+      <div class="bg-slate-50 p-3 rounded-xl border space-y-2">
+        <p id="otpPromptTarget" class="text-xs font-semibold text-slate-700">Food Item: Veg Pulao</p>
+        <input type="text" id="otpInput" maxlength="4" placeholder="Enter 4-Digit OTP" class="w-36 mx-auto text-center font-black tracking-widest text-2xl border-2 border-emerald-500 rounded-lg py-1.5 outline-none bg-white">
+        <p id="otpError" class="text-rose-600 text-[11px] hidden font-semibold">Invalid OTP code. Please check with volunteer.</p>
+      </div>
+      <div class="flex space-x-2">
+        <button onclick="closeModal('otpModal')" class="w-1/2 py-2 border rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
+        <button onclick="validateHandoverOtp()" class="w-1/2 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow">Verify & Handover</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="bg-white border-t border-slate-200 mt-12 py-6 text-center text-xs text-slate-500">
+    <p><strong>Food Donation Coordination System</strong> — BCA / B.Tech / MCA Major Project Working Prototype</p>
+    <p class="mt-1">Built to eliminate food wastage and ensure timely coordination with verified NGOs.</p>
+  </footer>
+
+  <!-- Core JavaScript State & Business Logic -->
+  <script>
+    // Initial Seed State (Persisted in localStorage)
+    const DEFAULT_DATA = {
+      donations: [
+        {
+          id: 101,
+          title: "Steamed Basmati Rice & Mixed Dal",
+          donor: "The Grand Taj Hotel",
+          donorType: "HOTEL",
+          category: "COOKED",
+          type: "VEG",
+          servings: 80,
+          weight: 35,
+          distance: 1.8,
+          cookedTime: "12:30 PM",
+          expiryHoursRemaining: 3.5,
+          storage: "Clean hot insulated thermal containers at 60C",
+          address: "45 Central Avenue, Kitchen Gate 2",
+          status: "AVAILABLE", // AVAILABLE, CLAIMED, PICKED_UP, DELIVERED, EXPIRED
+          claimedBy: null,
+          otp: "5824"
+        },
+        {
+          id: 102,
+          title: "Fresh Baked Bread Loaves & Rolls",
+          donor: "Royal Bakers & Confectioners",
+          donorType: "RESTAURANT",
+          category: "BAKERY",
+          type: "VEG",
+          servings: 45,
+          weight: 15,
+          distance: 3.2,
+          cookedTime: "11:00 AM",
+          expiryHoursRemaining: 6.0,
+          storage: "Sealed food-grade paper packaging",
+          address: "12 Baker Street, Near Metro Station",
+          status: "CLAIMED",
+          claimedBy: "Hope Shelter",
+          otp: "8421"
+        },
+        {
+          id: 103,
+          title: "Paneer Pulao & Vegetable Sabzi",
+          donor: "The Grand Taj Hotel",
+          donorType: "HOTEL",
+          category: "COOKED",
+          type: "VEG",
+          servings: 50,
+          weight: 20,
+          distance: 1.8,
+          cookedTime: "Yesterday",
+          expiryHoursRemaining: 0,
+          storage: "Refrigerated",
+          address: "45 Central Avenue, Kitchen Gate 2",
+          status: "DELIVERED",
+          claimedBy: "Hope Shelter",
+          otp: "3319"
+        }
+      ],
+      ngos: [
+        { id: 1, name: "Hope Shelter & Orphanage", reg: "NGO-BLR-2024-8891", area: "Central Zone", beneficiaries: 120, status: "APPROVED" },
+        { id: 2, name: "Smile Welfare Society", reg: "NGO-BLR-2025-1042", area: "East District", beneficiaries: 75, status: "PENDING" }
+      ],
+      notifications: [
+        { id: 1, text: "Hope Shelter claimed your 'Bread Loaves' donation. Volunteer en route.", time: "15 mins ago", read: false },
+        { id: 2, text: "New donation: 80 servings of Steamed Rice available nearby.", time: "1 hour ago", read: false }
+      ]
+    };
+
+    let appData = JSON.parse(localStorage.getItem('food_rescue_db')) || DEFAULT_DATA;
+    function saveData() { localStorage.setItem('food_rescue_db', JSON.stringify(appData)); }
+
+    let currentRole = "DONOR";
+    let ngoCurrentTab = "FEED";
+    let activeOtpDonationId = null;
+
+    // Initialize UI on load
+    window.addEventListener('DOMContentLoaded', () => {
+      // Set default time inputs
+      const now = new Date();
+      const cookTimeStr = now.toTimeString().substring(0,5);
+      now.setHours(now.getHours() + 5);
+      const expiryTimeStr = now.toTimeString().substring(0,5);
+      
+      const ctInput = document.getElementById('fCookTime');
+      const etInput = document.getElementById('fExpiryTime');
+      if (ctInput) ctInput.value = cookTimeStr;
+      if (etInput) etInput.value = expiryTimeStr;
+
+      switchRole("DONOR");
+      renderNotifications();
+    });
+
+    // Role Switching Engine
+    function switchRole(role) {
+      currentRole = role;
+      document.getElementById('roleSelector').value = role;
+
+      const bannerTag = document.getElementById('roleTag');
+      const bannerWelcome = document.getElementById('roleWelcome');
+      const bannerSub = document.getElementById('roleSubtext');
+      const donorSec = document.getElementById('donorSection');
+      const ngoSec = document.getElementById('ngoSection');
+      const adminSec = document.getElementById('adminSection');
+
+      donorSec.classList.add('hidden');
+      ngoSec.classList.add('hidden');
+      adminSec.classList.add('hidden');
+
+      if (role === 'DONOR') {
+        bannerTag.innerText = "DONOR PORTAL";
+        bannerWelcome.innerText = "Welcome, The Grand Taj Hotel";
+        bannerSub.innerText = "Post surplus food, coordinate pickups, and verify volunteers with OTP.";
+        donorSec.classList.remove('hidden');
+        renderDonorListings();
+      } else if (role === 'NGO') {
+        bannerTag.innerText = "NGO & RECIPIENT PORTAL";
+        bannerWelcome.innerText = "Welcome, Hope Shelter & Orphanage";
+        bannerSub.innerText = "Browse available surplus food nearby and claim meals for your shelter.";
+        ngoSec.classList.remove('hidden');
+        renderNGOFeed();
+      } else if (role === 'ADMIN') {
+        bannerTag.innerText = "ADMINISTRATOR DASHBOARD";
+        bannerWelcome.innerText = "System Operations & Verification Center";
+        bannerSub.innerText = "Accredit NGOs, moderate food listings, and monitor community impact metrics.";
+        adminSec.classList.remove('hidden');
+        renderAdminDashboard();
+      }
+      updateGlobalStats();
+    }
+
+    // Update Top Counters
+    function updateGlobalStats() {
+      const totalMeals = appData.donations.reduce((sum, d) => sum + (d.status === 'DELIVERED' ? d.servings : 0), 1200);
+      const totalKg = Math.round(totalMeals * 0.4);
+      const activeCount = appData.donations.filter(d => d.status === 'AVAILABLE' || d.status === 'CLAIMED').length;
+      const approvedNgos = appData.ngos.filter(n => n.status === 'APPROVED').length;
+
+      document.getElementById('statMeals').innerText = totalMeals.toLocaleString();
+      document.getElementById('statKg').innerText = totalKg + " kg";
+      document.getElementById('statActive').innerText = activeCount + " Active";
+      document.getElementById('statNGOs').innerText = approvedNgos + " Verified";
+    }
+
+    // -------------------------------------------------------------
+    // DONOR FUNCTIONS
+    // -------------------------------------------------------------
+    function renderDonorListings() {
+      const container = document.getElementById('donorListings');
+      container.innerHTML = "";
+      
+      const donorPosts = appData.donations.filter(d => d.donor === "The Grand Taj Hotel");
+      if (donorPosts.length === 0) {
+        container.innerHTML = `<div class="col-span-3 text-center p-8 bg-white rounded-xl border text-slate-400">No donations posted yet. Click "+ Add Surplus Food" to list excess meals.</div>`;
+        return;
+      }
+
+      donorPosts.forEach(d => {
+        const card = document.createElement('div');
+        card.className = "bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3 flex flex-col justify-between";
+
+        let statusBadge = "";
+        let actionBtn = "";
+
+        if (d.status === 'AVAILABLE') {
+          statusBadge = `<span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full">AVAILABLE (Awaiting Claim)</span>`;
+          actionBtn = `<button onclick="cancelDonation(${d.id})" class="text-xs text-rose-600 font-semibold hover:underline">Cancel Listing</button>`;
+        } else if (d.status === 'CLAIMED') {
+          statusBadge = `<span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full pulse-urgent">CLAIMED by ${d.claimedBy}</span>`;
+          actionBtn = `<button onclick="openOtpModal(${d.id}, '${d.title}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-xs shadow">Verify Volunteer Handover (OTP)</button>`;
+        } else if (d.status === 'PICKED_UP') {
+          statusBadge = `<span class="bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded-full">IN TRANSIT</span>`;
+          actionBtn = `<p class="text-[11px] text-slate-500 italic">Volunteer is transporting meals to shelter.</p>`;
+        } else if (d.status === 'DELIVERED') {
+          statusBadge = `<span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">DELIVERED & CLOSED</span>`;
+          actionBtn = `<span class="text-xs font-semibold text-emerald-600"><i class="fa-solid fa-circle-check mr-1"></i>Meals Distributed</span>`;
+        }
+
+        card.innerHTML = `
+          <div>
+            <div class="flex justify-between items-start">
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded ${d.type === 'VEG' ? 'badge-veg' : 'badge-nonveg'}">${d.type === 'VEG' ? '🌱 VEG' : '🍗 NON-VEG'}</span>
+              ${statusBadge}
+            </div>
+            <h4 class="font-bold text-slate-800 text-sm mt-2">${d.title}</h4>
+            <div class="grid grid-cols-2 gap-1 text-slate-600 text-xs mt-2">
+              <p><i class="fa-solid fa-users text-slate-400 mr-1"></i><strong>${d.servings}</strong> Servings</p>
+              <p><i class="fa-solid fa-box text-slate-400 mr-1"></i><strong>${d.category}</strong></p>
+              <p><i class="fa-solid fa-clock text-slate-400 mr-1"></i>Cooked: ${d.cookedTime}</p>
+              <p><i class="fa-solid fa-hourglass-half text-amber-500 mr-1"></i><strong>${d.expiryHoursRemaining} hrs</strong> left</p>
+            </div>
+            <p class="text-[11px] text-slate-500 bg-slate-50 p-2 rounded mt-2"><i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>${d.address}</p>
+          </div>
+          <div class="pt-2 border-t flex items-center justify-between">
+            ${actionBtn}
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function handleFoodSubmit(e) {
+      e.preventDefault();
+      const title = document.getElementById('fTitle').value;
+      const category = document.getElementById('fCategory').value;
+      const type = document.getElementById('fType').value;
+      const servings = parseInt(document.getElementById('fServings').value);
+      const weight = parseInt(document.getElementById('fWeight').value) || Math.round(servings * 0.4);
+      const address = document.getElementById('fAddress').value;
+
+      const newId = 100 + appData.donations.length + 1;
+      const randomOtp = Math.floor(1000 + Math.random() * 9000).toString();
+
+      const newDonation = {
+        id: newId,
+        title: title,
+        donor: "The Grand Taj Hotel",
+        donorType: "HOTEL",
+        category: category,
+        type: type,
+        servings: servings,
+        weight: weight,
+        distance: 1.5,
+        cookedTime: "Just now",
+        expiryHoursRemaining: 5.0,
+        storage: document.getElementById('fStorage').value || "Insulated containers",
+        address: address,
+        status: "AVAILABLE",
+        claimedBy: null,
+        otp: randomOtp
+      };
+
+      appData.donations.unshift(newDonation);
+      appData.notifications.unshift({
+        id: Date.now(),
+        text: `New donation created: ${servings} servings of ${title}. Broadcasted to nearby NGOs.`,
+        time: "Just now",
+        read: false
+      });
+
+      saveData();
+      closeModal('addFoodModal');
+      document.getElementById('addFoodForm').reset();
+      renderDonorListings();
+      updateGlobalStats();
+      alert(`✅ Surplus food successfully published! Post is now visible to verified NGOs.`);
+    }
+
+    function cancelDonation(id) {
+      if (confirm("Are you sure you want to cancel this food donation?")) {
+        const item = appData.donations.find(d => d.id === id);
+        if (item) item.status = "CANCELLED";
+        saveData();
+        renderDonorListings();
+        updateGlobalStats();
+      }
+    }
+
+    // -------------------------------------------------------------
+    // NGO FUNCTIONS
+    // -------------------------------------------------------------
+    function setNgoTab(tab) {
+      ngoCurrentTab = tab;
+      const tabFeed = document.getElementById('tabNgoFeed');
+      const tabPickups = document.getElementById('tabNgoPickups');
+
+      if (tab === 'FEED') {
+        tabFeed.className = "pb-2 border-b-2 border-emerald-600 text-emerald-700 flex items-center space-x-2";
+        tabPickups.className = "pb-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2";
+      } else {
+        tabPickups.className = "pb-2 border-b-2 border-emerald-600 text-emerald-700 flex items-center space-x-2";
+        tabFeed.className = "pb-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 flex items-center space-x-2";
+      }
+      renderNGOFeed();
+    }
+
+    function renderNGOFeed() {
+      const container = document.getElementById('ngoListings');
+      container.innerHTML = "";
+
+      const availCount = appData.donations.filter(d => d.status === 'AVAILABLE').length;
+      const myClaimCount = appData.donations.filter(d => d.claimedBy === 'Hope Shelter' && (d.status === 'CLAIMED' || d.status === 'PICKED_UP')).length;
+      
+      document.getElementById('ngoAvailableCount').innerText = availCount;
+      document.getElementById('ngoClaimedCount').innerText = myClaimCount;
+
+      let list = [];
+      if (ngoCurrentTab === 'FEED') {
+        list = appData.donations.filter(d => d.status === 'AVAILABLE');
+      } else {
+        list = appData.donations.filter(d => d.claimedBy === 'Hope Shelter');
+      }
+
+      // Filter by Search & Dietary
+      const search = (document.getElementById('ngoSearch')?.value || '').toLowerCase();
+      const diet = document.getElementById('ngoFilterDiet')?.value || 'ALL';
+      list = list.filter(d => {
+        const matchSearch = d.title.toLowerCase().includes(search) || d.donor.toLowerCase().includes(search);
+        const matchDiet = diet === 'ALL' || d.type === diet;
+        return matchSearch && matchDiet;
+      });
+
+      if (list.length === 0) {
+        container.innerHTML = `<div class="col-span-3 text-center p-8 bg-white rounded-xl border text-slate-400">No donations matching your selection.</div>`;
+        return;
+      }
+
+      list.forEach(d => {
+        const card = document.createElement('div');
+        card.className = "bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3 flex flex-col justify-between";
+
+        let actionArea = "";
+
+        if (d.status === 'AVAILABLE') {
+          actionArea = `
+            <div class="pt-3 border-t flex justify-between items-center w-full">
+              <span class="text-xs text-slate-500 font-semibold"><i class="fa-solid fa-map-pin mr-1"></i>${d.distance} km away</span>
+              <button onclick="claimFood(${d.id})" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow">Claim This Food</button>
+            </div>
+          `;
+        } else if (d.status === 'CLAIMED') {
+          actionArea = `
+            <div class="pt-3 border-t w-full space-y-2">
+              <div class="bg-amber-50 border border-amber-200 p-2.5 rounded-lg text-center">
+                <p class="text-[10px] text-amber-800 font-bold uppercase tracking-wider">Your Pickup Verification OTP</p>
+                <p class="text-xl font-black text-amber-900 tracking-widest my-0.5">${d.otp}</p>
+                <p class="text-[10px] text-amber-700">Present this 4-digit code to donor upon collection.</p>
+              </div>
+            </div>
+          `;
+        } else if (d.status === 'PICKED_UP') {
+          actionArea = `
+            <div class="pt-3 border-t w-full space-y-2">
+              <span class="text-xs text-purple-700 font-bold block"><i class="fa-solid fa-van-shuttle mr-1"></i>Meals in transit</span>
+              <button onclick="completeDelivery(${d.id})" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 rounded-lg text-xs shadow">Confirm Delivery to Beneficiaries</button>
+            </div>
+          `;
+        } else if (d.status === 'DELIVERED') {
+          actionArea = `
+            <div class="pt-3 border-t w-full text-center">
+              <span class="text-xs font-semibold text-emerald-600"><i class="fa-solid fa-check-circle mr-1"></i>Successfully Distributed</span>
+            </div>
+          `;
+        }
+
+        card.innerHTML = `
+          <div>
+            <div class="flex justify-between items-start">
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded ${d.type === 'VEG' ? 'badge-veg' : 'badge-nonveg'}">${d.type === 'VEG' ? '🌱 VEG' : '🍗 NON-VEG'}</span>
+              <span class="text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full"><i class="fa-solid fa-stopwatch mr-1"></i>Safe for ${d.expiryHoursRemaining} hrs</span>
+            </div>
+            <h4 class="font-bold text-slate-800 text-sm mt-2">${d.title}</h4>
+            <p class="text-xs text-slate-500 font-medium">Provided by: <strong class="text-slate-700">${d.donor}</strong></p>
+            <div class="grid grid-cols-2 gap-1 text-slate-600 text-xs mt-2">
+              <p><i class="fa-solid fa-bowl-food text-slate-400 mr-1"></i><strong>${d.servings}</strong> Servings</p>
+              <p><i class="fa-solid fa-weight-hanging text-slate-400 mr-1"></i>Approx <strong>${d.weight} kg</strong></p>
+            </div>
+            <p class="text-[11px] text-slate-500 bg-slate-50 p-2 rounded mt-2"><i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>${d.address}</p>
+          </div>
+          ${actionArea}
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function claimFood(id) {
+      const item = appData.donations.find(d => d.id === id);
+      if (!item) return;
+
+      if (confirm(`Claim ${item.servings} servings of "${item.title}" from ${item.donor}?`)) {
+        item.status = "CLAIMED";
+        item.claimedBy = "Hope Shelter";
+
+        appData.notifications.unshift({
+          id: Date.now(),
+          text: `Hope Shelter claimed donation #${item.id}. Generated OTP: ${item.otp}`,
+          time: "Just now",
+          read: false
+        });
+
+        saveData();
+        setNgoTab('MY_PICKUPS');
+        updateGlobalStats();
+        alert(`🎉 Food claimed successfully!\n\nYour Pickup Verification OTP is: ${item.otp}\nShow this code to the donor when collecting the meals.`);
+      }
+    }
+
+    function completeDelivery(id) {
+      const item = appData.donations.find(d => d.id === id);
+      if (item && confirm("Confirm that meals were safely distributed to shelter residents?")) {
+        item.status = "DELIVERED";
+        saveData();
+        renderNGOFeed();
+        updateGlobalStats();
+        alert("❤️ Thank you! Distribution recorded. Donor has been notified of completion.");
+      }
+    }
+
+    // -------------------------------------------------------------
+    // OTP HANDOVER MODAL
+    // -------------------------------------------------------------
+    function openOtpModal(id, title) {
+      activeOtpDonationId = id;
+      document.getElementById('otpPromptTarget').innerText = "Food Item: " + title;
+      document.getElementById('otpInput').value = "";
+      document.getElementById('otpError').classList.add('hidden');
+      openModal('otpModal');
+    }
+
+    function validateHandoverOtp() {
+      const enteredOtp = document.getElementById('otpInput').value.trim();
+      const item = appData.donations.find(d => d.id === activeOtpDonationId);
+
+      if (!item) return;
+
+      if (enteredOtp === item.otp) {
+        item.status = "PICKED_UP";
+        saveData();
+        closeModal('otpModal');
+        renderDonorListings();
+        updateGlobalStats();
+        alert("✅ OTP Verified! Handover confirmed. Status updated to 'IN TRANSIT'.");
+      } else {
+        document.getElementById('otpError').classList.remove('hidden');
+      }
+    }
+
+    // -------------------------------------------------------------
+    // ADMIN FUNCTIONS
+    // -------------------------------------------------------------
+    function renderAdminDashboard() {
+      // 1. Render NGO Verification List
+      const ngoContainer = document.getElementById('adminNgoList');
+      ngoContainer.innerHTML = "";
+
+      appData.ngos.forEach(ngo => {
+        const item = document.createElement('div');
+        item.className = "p-3 border rounded-xl bg-slate-50 space-y-2 text-xs";
+        
+        let statusBadge = "";
+        let actionBtn = "";
+        if (ngo.status === 'PENDING') {
+          statusBadge = `<span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">PENDING REVIEW</span>`;
+          actionBtn = `
+            <div class="flex space-x-2 pt-1">
+              <button onclick="verifyNgo(${ngo.id}, true)" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded text-[11px]">Approve</button>
+              <button onclick="verifyNgo(${ngo.id}, false)" class="bg-rose-500 hover:bg-rose-600 text-white font-bold px-2.5 py-1 rounded text-[11px]">Reject</button>
+            </div>
+          `;
+        } else {
+          statusBadge = `<span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">VERIFIED</span>`;
+        }
+
+        item.innerHTML = `
+          <div class="flex justify-between items-start">
+            <h4 class="font-bold text-slate-800 text-xs">${ngo.name}</h4>
+            ${statusBadge}
+          </div>
+          <p class="text-slate-500">Reg: <strong>${ngo.reg}</strong> | Capacity: <strong>${ngo.beneficiaries}</strong></p>
+          <p class="text-[11px] text-blue-600 hover:underline cursor-pointer"><i class="fa-solid fa-file-pdf mr-1"></i>View Registration Certificate</p>
+          ${actionBtn}
+        `;
+        ngoContainer.appendChild(item);
+      });
+
+      // 2. Render Stream Table
+      const tbody = document.getElementById('adminTableBody');
+      tbody.innerHTML = "";
+
+      appData.donations.forEach(d => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50";
+        tr.innerHTML = `
+          <td class="p-2.5 font-bold">#${d.id}</td>
+          <td class="p-2.5">${d.title}</td>
+          <td class="p-2.5">${d.donor}</td>
+          <td class="p-2.5">${d.servings} Servings</td>
+          <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${d.status === 'AVAILABLE' ? 'bg-blue-100 text-blue-800' : d.status === 'CLAIMED' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">${d.status}</span></td>
+          <td class="p-2.5"><button onclick="adminRemovePost(${d.id})" class="text-rose-500 hover:underline">Remove</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function verifyNgo(id, approved) {
+      const ngo = appData.ngos.find(n => n.id === id);
+      if (ngo) {
+        ngo.status = approved ? "APPROVED" : "REJECTED";
+        saveData();
+        renderAdminDashboard();
+        updateGlobalStats();
+        alert(`NGO "${ngo.name}" marked as ${ngo.status}!`);
+      }
+    }
+
+    function adminRemovePost(id) {
+      if (confirm(`Remove listing #${id} for moderation?`)) {
+        appData.donations = appData.donations.filter(d => d.id !== id);
+        saveData();
+        renderAdminDashboard();
+        updateGlobalStats();
+      }
+    }
+
+    function exportCSVReport() {
+      let csv = "Donation ID,Food Title,Donor,Servings,Weight (kg),Status,Claimed By\n";
+      appData.donations.forEach(d => {
+        csv += `${d.id},"${d.title}","${d.donor}",${d.servings},${d.weight},${d.status},"${d.claimedBy || 'None'}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Food_Donation_Report_${new Date().toISOString().substring(0,10)}.csv`;
+      a.click();
+    }
+
+    // -------------------------------------------------------------
+    // NOTIFICATIONS & MODALS
+    // -------------------------------------------------------------
+    function toggleNotificationPanel() {
+      const panel = document.getElementById('notifPanel');
+      panel.classList.toggle('hidden');
+    }
+
+    function renderNotifications() {
+      const list = document.getElementById('notifList');
+      list.innerHTML = "";
+      appData.notifications.forEach(n => {
+        const item = document.createElement('div');
+        item.className = "p-3 hover:bg-slate-50 transition cursor-pointer";
+        item.innerHTML = `
+          <p class="text-slate-700 leading-tight">${n.text}</p>
+          <span class="text-[10px] text-slate-400 mt-1 block">${n.time}</span>
+        `;
+        list.appendChild(item);
+      });
+      document.getElementById('notifBadge').innerText = appData.notifications.length;
+    }
+
+    function clearNotifications() {
+      appData.notifications = [];
+      saveData();
+      renderNotifications();
+      toggleNotificationPanel();
+    }
+
+    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+  </script>
+</body>
+</html>
